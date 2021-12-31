@@ -1,56 +1,117 @@
 import pandas as pd
 import os
 import nltk
-nltk.download('stopwords')
+import csv 
+from pprint import pprint
+import gensim.corpora as corpora
+# Load the regular expression library
+import re
+# Import the wordcloud library
+from wordcloud import WordCloud
+import gensim
+from gensim.utils import simple_preprocess
 from nltk.corpus import stopwords
 
+nltk.download('stopwords')
 stop_words = stopwords.words('english')
 stop_words.extend(['from', 'subject', 're', 'edu', 'use'])
 
-def sent_to_words(sentences):
+
+# def writeToCsv(data):
+#     header = ['topic','content']
+
+#     with open('data.csv', 'w', encoding='UTF8') as f:
+#         writer = csv.writer(f)
+
+#         # write the header
+#         writer.writerow(header)
+#         print(data)
+
+#         # write the data
+#         writer.writerow(data)
+
+def readData(rootdir):
+    Matrix = [] # list of [topic, text]
+
+    for topic in os.listdir(rootdir):
+        for subdir, dirs, files in os.walk(os.path.join(rootdir, topic)):
+            # file =files[0]
+            for file in files:
+                with open(os.path.join(rootdir, topic,file)) as f:
+                    try:
+                        lines = f.readlines()
+                        count =0
+                        for line in lines :
+                            if(line != "\n" ):
+                                count= count +1
+                            else:
+                                content = ' '.join(lines[count:])
+                                Matrix.append([topic,content])
+                                break
+                    except:
+                        print(f)
+    dataFrame = pd.DataFrame(Matrix, columns=['topic', 'content'])
+    return dataFrame
+
+def sentenceToWords(sentences):
     for sentence in sentences:
         # deacc=True removes punctuations
         yield(gensim.utils.simple_preprocess(str(sentence), deacc=True))
 
-def remove_stopwords(texts):
-    return [[word for word in simple_preprocess(str(doc))
+def removePunctuation(data):
+     data['content']= data['content'].map(lambda x: re.sub('[,\.!?]', '', x))
+
+
+def removeStopwords(texts):
+    return [[word for word in simple_preprocess(str(doc)) 
              if word not in stop_words] for doc in texts]
 
+def wordCloud(data):
+    # Join the different processed titles together.
+    long_string = ','.join(list(data['content'].values))
+    print (long_string)
 
-rootdir ='data'
-data =[]
-# Creates a list containing 20 lists, each of 1000 items, all set to 0
-# Matrix = [[0 for x in range(20)] for y in range(1000)] 
-Matrix = [[0,0] for y in range(1000)] 
+    # Create a WordCloud object
+    wordcloud = WordCloud(background_color="white", max_words=1000, contour_width=3, contour_color='steelblue')
 
-i=0
-for topic in os.listdir(rootdir):
-    list =[]
-    for subdir, dirs, files in os.walk(os.path.join(rootdir, topic)):
-        file =files[0]
-#         for file in files:
-        if (topic == "sci.med"):
-            with open(os.path.join(rootdir, topic,file)) as f:
-                lines = f.readlines()
-                count =0
-                for line in lines :
-                    if(line != "\n" ):
-                        count= count +1
-                    else:
-                        content = lines[count:]
-#                         print ('contents',count,content)
-                        list.append(content)
-                        break
-                        # print ('file:',file)
-                        filepath = subdir + os.sep + file
-    Matrix[i]=[topic,list]
-    i=i+1
+    # Generate a word cloud
+    wordcloud.generate(long_string)
 
-# frame = pd.concat(list, axis=0, ignore_index=True)
-# print ('frame',frame)
-print ('Matrix',Matrix)
-data_frame = pd.DataFrame(Matrix, columns=['t', 'c'])
-print ('data_frame',Matrix)
+    # Visualize the word cloud
+    wordcloud.to_image()
+
+rootdir='data'
+data = readData(rootdir)
+removePunctuation(data)
+# wordCloud(data)
+data = data.content.values.tolist()
+# print(data)
+data_words = list(sentenceToWords(data))
+# remove stop words
+data_words = removeStopwords(data_words)
+# print(data_words[:1][0][:30])
+# Create Dictionary
+id2word = corpora.Dictionary(data_words)
+# Create Corpus
+texts = data_words
+
+# Term Document Frequency
+corpus = [id2word.doc2bow(text) for text in texts]
+
+# View
+# print(corpus[:1][0][:30])
+
+# number of topics
+num_topics = 20
+
+# Build LDA model
+lda_model = gensim.models.LdaMulticore(corpus=corpus,
+                                       id2word=id2word,
+                                       num_topics=num_topics)
+
+# Print the Keyword in the 10 topics
+# pprint(lda_model.print_topics())
+doc_lda = lda_model[corpus]
 
 
 #             pd.read
