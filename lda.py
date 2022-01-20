@@ -3,13 +3,13 @@ import os
 import nltk
 import csv 
 from pprint import pprint
-import gensim.corpora as corpora
 # Load the regular expression library
 import re
 # Import the wordcloud library
 from wordcloud import WordCloud
 import gensim
 from gensim.utils import simple_preprocess
+import gensim.corpora as corpora
 from nltk.corpus import stopwords
 
 nltk.download('stopwords')
@@ -56,10 +56,18 @@ def readData(rootdir):
 def sentenceToWords(sentences):
     for sentence in sentences:
         # deacc=True removes punctuations
-        yield(gensim.utils.simple_preprocess(str(sentence), deacc=True))
+        yield(gensim.utils.simple_preprocess(str(sentence), deacc=True))# deacc=True removes punctuations
 
-def removePunctuation(data):
+def cleanData(data):
+    # remove Punctuation
      data['content']= data['content'].map(lambda x: re.sub('[,\.!?]', '', x))
+     # Remove Emails
+     data['content']= data['content'].map(lambda x: re.sub('\S*@\S*\s?', '', x))
+    # Remove new line characters
+     data['content']= data['content'].map(lambda x: re.sub('\s+', '', x))
+    # Remove distracting single quotes
+     data['content']= data['content'].map(lambda x: re.sub("\'", '', x))
+
 
 
 def removeStopwords(texts):
@@ -82,14 +90,15 @@ def wordCloud(data):
 
 rootdir='data'
 data = readData(rootdir)
-removePunctuation(data)
+cleanData(data)
 # wordCloud(data)
 data = data.content.values.tolist()
-# print(data)
 data_words = list(sentenceToWords(data))
+
 # remove stop words
 data_words = removeStopwords(data_words)
 # print(data_words[:1][0][:30])
+
 # Create Dictionary
 id2word = corpora.Dictionary(data_words)
 # Create Corpus
@@ -110,7 +119,7 @@ lda_model = gensim.models.LdaMulticore(corpus=corpus,
                                        num_topics=num_topics)
 
 # Print the Keyword in the 10 topics
-# pprint(lda_model.print_topics())
+pprint(lda_model.print_topics())
 doc_lda = lda_model[corpus]
 
 
